@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:countries_world_map/countries_world_map.dart';
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 // import 'package:countries_world_map/data/maps/countries/japan/japan.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+
+  await Supabase.initialize(
+    url: 'https://rrobtjgxsjkpirquaxrq.supabase.co',
+    publishableKey: 'sb_publishable_4d8Iwa0SLDhMsmpUnuf73w_OVXa0aIJ',
+  );
+
   runApp(const MyApp());
 }
 
