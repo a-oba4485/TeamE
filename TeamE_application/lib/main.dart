@@ -45,6 +45,21 @@ class MapScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('思い出の地を選ぶ'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'ログアウト',
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: Center(
         // InteractiveViewerで囲むと、地図を指で拡大縮小（ピンチ）できるようになります！

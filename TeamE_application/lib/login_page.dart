@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart'; // MapScreen を使うため
+import 'main.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -41,7 +41,6 @@ class _LoginPageState extends State<LoginPage> {
       final supabase = Supabase.instance.client;
       await supabase.auth.signInWithPassword(email: email, password: password);
       if (!mounted) return;
-      // ログイン後は、戻るボタンでログイン画面に戻れないよう置き換える
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const MapScreen()),
