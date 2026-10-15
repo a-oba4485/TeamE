@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:countries_world_map/countries_world_map.dart';
-import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:countries_world_map/countries_world_map.dart';
 
 import 'login_page.dart';
-
-// import 'package:countries_world_map/data/maps/countries/japan/japan.dart';
+// 3枚目のファイル名を 'prefecture_timeline_page.dart' とした場合のインポート
+import 'prefecture_timeline_page.dart'; 
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +25,6 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: '思い出共有アプリ',
       theme: ThemeData(
-        // アプリのメインカラーを青系に設定
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
@@ -35,7 +33,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// ここから下が日本地図を表示する画面のコードです
+// 統合されたメインの地図画面
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
 
@@ -45,6 +43,7 @@ class MapScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('思い出の地を選ぶ'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        // ご指定のログアウト処理をそのまま使用
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -62,29 +61,26 @@ class MapScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        // InteractiveViewerで囲むと、地図を指で拡大縮小（ピンチ）できるようになります！
         child: InteractiveViewer(
           child: SimpleMap(
-            // 日本地図のデータを指定
             instructions: SMapJapan.instructions,
-
-            // 地図の基本の色
             defaultColor: Colors.grey.shade50,
-            countryBorder: CountryBorder(color: Colors.black),
-            // 思い出が登録されている県（例）だけ色を変える
+            countryBorder: const CountryBorder(color: Colors.black),
             colors: const {
-              "JP-40": Colors.blue, // 福岡県
+              "JP-40": Colors.blue,
               "JP-13": Colors.orange,
-              "JP-1": Colors.red, // 東京都
-              "JP-01": Colors.orange, // 東京都
+              "JP-1": Colors.red,
+              "JP-01": Colors.orange,
             },
-
-            // タップされた時の処理
             callback: (id, name, tapDetails) {
-              // VS Codeの「デバッグコンソール」にタップした県名が表示されます
-              print("$name ($id) がタップされました！");
-
-              // ※将来的に、ここに「〇〇県のアルバム画面へ移動する」コードを書きます
+              // 県をタップしたら投稿画面へ移動する（繋がりを持たせる）
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      PrefectureTimelinePage(prefectureName: name),
+                ),
+              );
             },
           ),
         ),
