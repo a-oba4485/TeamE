@@ -18,13 +18,25 @@ class _PrefectureTimelinePageState extends State<PrefectureTimelinePage> {
 
   late final Stream<List<Map<String, dynamic>>> _postsStream;
 
-  @override
+@override
   void initState() {
     super.initState();
-    _postsStream = supabase
-        .from('posts')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false);
+    
+    // 現在ログインしているユーザーのIDを取得
+    final userId = supabase.auth.currentUser?.id;
+    
+    if (userId != null) {
+      // ログイン中の場合：県名 と 自分のID の両方で絞り込む！
+      _postsStream = supabase
+          .from('posts')
+          .stream(primaryKey: ['id'])
+          .eq('prefecture', widget.prefectureName)
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+    } else {
+      // ログインしていない場合は空っぽにする
+      _postsStream = const Stream.empty();
+    }
   }
 
   @override
@@ -58,6 +70,8 @@ class _PrefectureTimelinePageState extends State<PrefectureTimelinePage> {
 
       await supabase.from('posts').insert({
         'user_id': user.id,
+        'user_email':user.email,
+        'prefecture':widget.prefectureName,
         'image_url': imageUrl,
         'comment': _commentController.text,
       });
@@ -103,6 +117,13 @@ class _PrefectureTimelinePageState extends State<PrefectureTimelinePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    ListTile(
+                      leading:const Icon(Icons.account_circle,color:Colors.blue),
+                      title: Text(
+                        post['user_email'] ?? 'Unknown',
+                        style: const TextStyle(fontWeight: FontWeight.bold)
+                      ),
+                    ),
                     Image.network(
                       post['image_url'],
                       width: double.infinity,
