@@ -3,8 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:countries_world_map/countries_world_map.dart';
 
 import 'login_page.dart';
+import 'auth_gate.dart';
 // 3枚目のファイル名を 'prefecture_timeline_page.dart' とした場合のインポート
-import 'prefecture_timeline_page.dart'; 
+import 'prefecture_timeline_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const LoginPage(),
+      home: const AuthGate(),
     );
   }
 }
