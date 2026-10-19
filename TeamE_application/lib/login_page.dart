@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
 import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -40,11 +39,6 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final supabase = Supabase.instance.client;
       await supabase.auth.signInWithPassword(email: email, password: password);
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MapScreen()),
-      );
     } on AuthException {
       if (mounted) {
         setState(() => _errorMessage = 'メールアドレスまたはパスワードが違います');

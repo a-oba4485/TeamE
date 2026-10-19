@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'main.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -40,11 +39,7 @@ class _RegisterPageState extends State<RegisterPage> {
       final supabase = Supabase.instance.client;
       await supabase.auth.signUp(email: email, password: password);
       if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const MapScreen()),
-        (route) => false,
-      );
+      Navigator.popUntil(context, (route) => route.isFirst);
     } on AuthException catch (e) {
       if (mounted) setState(() => _errorMessage = e.message);
     } catch (_) {

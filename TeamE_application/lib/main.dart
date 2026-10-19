@@ -51,12 +51,6 @@ class MapScreen extends StatelessWidget {
             tooltip: 'ログアウト',
             onPressed: () async {
               await Supabase.instance.client.auth.signOut();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-                (route) => false,
-              );
             },
           ),
         ],
