@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:countries_world_map/countries_world_map.dart';
 
-import 'login_page.dart';
 import 'auth_gate.dart';
 // 3枚目のファイル名を 'prefecture_timeline_page.dart' とした場合のインポート
 import 'prefecture_timeline_page.dart';
@@ -24,6 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: '思い出共有アプリ',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
