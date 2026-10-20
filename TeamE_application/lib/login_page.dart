@@ -14,6 +14,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -69,8 +70,19 @@ class _LoginPageState extends State<LoginPage> {
             ),
             TextField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'パスワード'),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: 'パスワード',
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  tooltip: _obscurePassword ? 'パスワードを表示' : 'パスワードを隠す',
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                ),
+              ),
             ),
             if (_errorMessage != null) ...[
               const SizedBox(height: 12),
