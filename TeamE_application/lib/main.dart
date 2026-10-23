@@ -26,7 +26,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: '思い出共有アプリ',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFD84A38)),
+        scaffoldBackgroundColor: const Color(0xFFFAF9F6),
         useMaterial3: true,
       ),
       home: const AuthGate(),
