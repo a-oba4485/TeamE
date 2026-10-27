@@ -25,7 +25,6 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  // Supabaseの英語のエラー文を、日本語に変える
   String _toJapanese(String message) {
     final m = message.toLowerCase();
     if (m.contains('already registered') ||
@@ -45,11 +44,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _register() async {
+    if (_isLoading) return;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmController.text;
 
-    // 入力チェック
     if (email.isEmpty || password.isEmpty) {
       setState(() => _errorMessage = '未入力の項目があります');
       return;
@@ -72,7 +71,6 @@ class _RegisterPageState extends State<RegisterPage> {
       final supabase = Supabase.instance.client;
       await supabase.auth.signUp(email: email, password: password);
       if (!mounted) return;
-      // 登録画面を閉じて、AuthGateが切り替えた画面（地図）を表示する
       Navigator.popUntil(context, (route) => route.isFirst);
     } on AuthException catch (e) {
       if (mounted) setState(() => _errorMessage = _toJapanese(e.message));
@@ -92,8 +90,6 @@ class _RegisterPageState extends State<RegisterPage> {
       borderRadius: BorderRadius.circular(10),
       borderSide: const BorderSide(color: Color(0xFFE1E3E8)),
     );
-
-    // 入力欄の見た目を作る部品（3つの欄で使い回す）
     InputDecoration fieldStyle(String label, IconData icon, {Widget? suffix}) {
       return InputDecoration(
         labelText: label,
@@ -137,25 +133,29 @@ class _RegisterPageState extends State<RegisterPage> {
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   decoration: fieldStyle('メールアドレス', Icons.email_outlined),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.next,
                   decoration: fieldStyle(
                     'パスワード',
                     Icons.lock_outline,
-                    suffix: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                    suffix: ExcludeFocus(
+                      child: IconButton(
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        tooltip: _obscurePassword ? 'パスワードを表示' : 'パスワードを隠す',
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
                       ),
-                      tooltip: _obscurePassword ? 'パスワードを表示' : 'パスワードを隠す',
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
                     ),
                   ),
                 ),
@@ -163,6 +163,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 TextField(
                   controller: _confirmController,
                   obscureText: _obscureConfirm,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _register(),
                   decoration: fieldStyle(
                     'パスワード確認',
                     Icons.lock_outline,
