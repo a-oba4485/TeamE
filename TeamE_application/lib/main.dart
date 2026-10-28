@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:countries_world_map/countries_world_map.dart';
 
 import 'auth_gate.dart';
+import 'change_password_page.dart';
 // 3枚目のファイル名を 'prefecture_timeline_page.dart' とした場合のインポート
 import 'prefecture_timeline_page.dart';
 
@@ -109,6 +110,14 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('思い出の地を選ぶ'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.key),
+            tooltip: 'パスワード変更',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'ログアウト',
