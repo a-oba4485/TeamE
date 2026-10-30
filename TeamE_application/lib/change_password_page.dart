@@ -26,13 +26,44 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
+  String _toJapanese(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('different from the old password') || m.contains('same password')){
+    return '新しいパスワードは現在と違うものにしてくださ';
+    }
+    if (m.contains('password') && m.contains('at least')) {
+      return 'パスワードは6文字以上で設定してください';
+    }
+    if (m.contains('weak')) {
+      return 'パスワードが簡単すぎます。別のパスワードにしてください';
+    }
+    if (m.contains('rate limit')) {
+      return '短時間に何度も試されました。時間をおいて再度お試しください';
+    }
+    return '変更に失敗しました。入力内容をご確認ください';
+  }
+
+
     Future<void> _changePassword() async {
     if (_isLoading) return;
     final current = _currentController.text;
     final newPassword = _newController.text;
+    final confirm = _confirmController.text;
 
-    if (current.isEmpty || newPassword.isEmpty) {
+    if (current.isEmpty || newPassword.isEmpty || confirm.isEmpty) {
       setState(() => _errorMessage = '未入力の項目があります');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setState(() => _errorMessage = '新しいパスワードは6文字以上で設定してください');
+      return;
+    }
+    if (newPassword != confirm) {
+      setState(() => _errorMessage = '新しいパスワードが一致しません');
+      return;
+    }
+    if (newPassword == current) {
+      setState(() => _errorMessage = '新しいパスワードは、現在のパスワードと違うものにしてください');
       return;
     }
 
@@ -63,7 +94,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       if (!mounted) return;
       Navigator.pop(context);
     } on AuthException catch (e) {
-      if (mounted) setState(() => _errorMessage = '変更に失敗しました: ${e.message}');
+      if (mounted) setState(() => _errorMessage = _toJapanese(e.message));
     } catch (_) {
       if (mounted) {
         setState(() => _errorMessage = '通信に失敗しました。時間をおいて再度お試しください');
