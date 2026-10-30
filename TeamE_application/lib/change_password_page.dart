@@ -1,4 +1,5 @@
 import "package:flutter/material.dart";
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -14,6 +15,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -21,6 +24,53 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     _newController.dispose();
     _confirmController.dispose();
     super.dispose();
+  }
+
+    Future<void> _changePassword() async {
+    if (_isLoading) return;
+    final current = _currentController.text;
+    final newPassword = _newController.text;
+
+    if (current.isEmpty || newPassword.isEmpty) {
+      setState(() => _errorMessage = '未入力の項目があります');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final email = supabase.auth.currentUser?.email;
+      if (email == null) {
+        setState(() => _errorMessage = 'ログイン情報を取得できませんでした');
+        return;
+      }
+
+      try {
+        await supabase.auth.signInWithPassword(
+          email: email,
+          password: current,
+        );
+      } on AuthException {
+        setState(() => _errorMessage = '現在のパスワードが違います');
+        return;
+      }
+
+      await supabase.auth.updateUser(UserAttributes(password: newPassword));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } on AuthException catch (e) {
+      if (mounted) setState(() => _errorMessage = '変更に失敗しました: ${e.message}');
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMessage = '通信に失敗しました。時間をおいて再度お試しください');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Widget _passwordField({
@@ -89,21 +139,37 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 onToggle: () =>
                     setState(() => _obscureConfirm = !_obscureConfirm),
               ),
+                            if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
-                child: FilledButton(
-                  onPressed: () {}, 
+                                child: FilledButton(
+                  onPressed: _isLoading ? null : _changePassword,
                   style: FilledButton.styleFrom(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'パスワードを変更',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'パスワードを変更',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],
