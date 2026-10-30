@@ -45,7 +45,38 @@ class MapScreen extends StatefulWidget {
 }
 class _MapScreenState extends State<MapScreen> {
   final supabase = Supabase.instance.client;
-  
+    // 地方ごとの都道府県一覧
+  final Map<String, List<String>> _regions = {
+    '北海道地方': ['北海道'],
+    '東北地方': [
+      '青森県', '岩手県', '宮城県',
+      '秋田県', '山形県', '福島県',
+    ],
+    '関東地方': [
+      '茨城県', '栃木県', '群馬県',
+      '埼玉県', '千葉県', '東京都', '神奈川県',
+    ],
+    '中部地方': [
+      '新潟県', '富山県', '石川県',
+      '福井県', '山梨県', '長野県',
+      '岐阜県', '静岡県', '愛知県',
+    ],
+    '近畿地方': [
+      '三重県', '滋賀県', '京都府',
+      '大阪府', '兵庫県', '奈良県', '和歌山県',
+    ],
+    '中国地方': [
+      '鳥取県', '島根県', '岡山県',
+      '広島県', '山口県',
+    ],
+    '四国地方': [
+      '徳島県', '香川県', '愛媛県', '高知県',
+    ],
+    '九州地方': [
+      '福岡県', '佐賀県', '長崎県',
+      '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+    ],
+  };
   Map<String, Color> _mapColors = {};
 
   // 英語のIDと日本語の県名の変換辞書
@@ -102,6 +133,23 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+    // 都道府県を選択して写真画面へ移動
+  Future<void> _openPrefecture(String prefectureName) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PrefectureTimelinePage(
+          prefectureName: prefectureName,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    // 写真画面から戻ったら地図の色を更新
+    _fetchActivePrefectures();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,33 +165,106 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
         ],
+        automaticallyImplyLeading: false,
       ),
-      body: Center(
-        child: InteractiveViewer(
-          child: SimpleMap(
-            key: ValueKey(_mapColors.toString()), 
-            instructions: SMapJapan.instructions,
-            defaultColor: Colors.grey.shade50,
-            countryBorder: const CountryBorder(color: Colors.black),
-            colors: _mapColors, 
-            callback: (id, name, tapDetails) async {
-              // ★ここが超重要！
-              // マップから来たID（例: jp-40）を小文字に揃えて、逆引き辞書で「福岡県」に翻訳する
-              final lowerId = id.toLowerCase();
-              final japaneseName = _idToPrefName[lowerId] ?? '不明な地域';
-
-              // 英語の name ではなく、翻訳した japaneseName を次の画面へ渡す
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PrefectureTimelinePage(prefectureName: japaneseName),
+      drawer: Drawer(
+        width: 300,
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFFFFB4A8),
+              ),
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  '地方・都道府県を選択',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              );
-              _fetchActivePrefectures();
-            },
-          ),
+              ),
+            ),
+
+            ..._regions.entries.expand((region) {
+              return [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    region.key,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFD84A38),
+                    ),
+                  ),
+                ),
+
+                ...region.value.map((prefecture) {
+                  return ListTile(
+                    dense: true,
+                    title: Text(prefecture),
+                    leading: const Icon(
+                      Icons.location_on_outlined,
+                      size: 20,
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openPrefecture(prefecture);
+                    },
+                  );
+                }),
+              ];
+            }),
+          ],
         ),
       ),
+      body: Stack(
+  children: [
+    // 既存の日本地図
+    Center(
+      child: InteractiveViewer(
+        child: SimpleMap(
+          key: ValueKey(_mapColors.toString()),
+          instructions: SMapJapan.instructions,
+          defaultColor: Colors.grey.shade50,
+          countryBorder: const CountryBorder(
+            color: Colors.black,
+          ),
+          colors: _mapColors,
+          callback: (id, name, tapDetails) async {
+  final lowerId = id.toLowerCase();
+  final japaneseName = _idToPrefName[lowerId] ?? '不明な地域';
+
+  if (japaneseName == '不明な地域') return;
+
+  await _openPrefecture(japaneseName);
+},
+        ),
+      ),
+    ),
+
+    // 左下のハンバーガーメニュー
+    Positioned(
+      left: 20,
+      bottom: 20,
+      child: Builder(
+        builder: (context) => FloatingActionButton(
+          heroTag: 'regionMenu',
+          backgroundColor: const Color(0xFFFFB4A8),
+          foregroundColor: Colors.black87,
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+          child: const Icon(Icons.menu),
+        ),
+      ),
+    ),
+  ],
+),
     );
   }
+
 }
