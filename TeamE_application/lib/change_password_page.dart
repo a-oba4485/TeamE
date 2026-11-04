@@ -92,7 +92,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
       await supabase.auth.updateUser(UserAttributes(password: newPassword));
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('パスワードを変更しました')),
+      );
     } on AuthException catch (e) {
       if (mounted) setState(() => _errorMessage = _toJapanese(e.message));
     } catch (_) {
