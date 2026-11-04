@@ -113,6 +113,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     required String label,
     required bool obscure,
     required VoidCallback onToggle,
+    TextInputAction action = TextInputAction.next,
+    VoidCallback? onSubmit, 
   }) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -121,6 +123,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      textInputAction: action,
+      onSubmitted: onSubmit == null ? null : (_) => onSubmit(),
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: const Icon(Icons.lock_outline),
@@ -173,6 +177,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 obscure: _obscureConfirm,
                 onToggle: () =>
                     setState(() => _obscureConfirm = !_obscureConfirm),
+                action: TextInputAction.done,
+                onSubmit: _changePassword,
               ),
                             if (_errorMessage != null) ...[
                 const SizedBox(height: 12),
