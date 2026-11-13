@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:countries_world_map/countries_world_map.dart';
-
 import 'auth_gate.dart';
 import 'change_password_page.dart';
-// 3枚目のファイル名を 'prefecture_timeline_page.dart' とした場合のインポート
 import 'prefecture_timeline_page.dart';
+import 'log.dart';
+import 'group.dart';
+import 'mypage.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,17 +37,71 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// 統合されたメインの地図画面
+// ========================================================
+// ★追加: ボトムナビゲーションとタブ切り替えを管理する親画面
+// ========================================================
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
-
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
+
 class _MapScreenState extends State<MapScreen> {
+  int _selectedIndex = 0;
+
+  // 4つのタブに対応する画面のリスト
+  final List<Widget> _screens = const [
+    HomeMapContent(), // 0: ホーム (地図画面)
+    LogScreen(),      // 1: 記録 (log.dart)
+    GroupScreen(),    // 2: グループ (group.dart)
+    MyPageScreen(),   // 3: マイページ (mypage.dart)
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // 現在選択されているタブの画面を表示
+      body: _screens[_selectedIndex],
+      
+      // アプリ全体で共通のボトムナビゲーション
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _selectedIndex, // 現在の選択状態
+        onTap: _onItemTapped,         // タップ時の切り替え処理
+        selectedItemColor: const Color(0xFFD84A38), // 選択時の色
+        unselectedItemColor: Colors.grey,           // 未選択時の色
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'ホーム'),
+          BottomNavigationBarItem(icon: Icon(Icons.pages), label: '記録'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'グループ'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'マイページ'),
+        ],
+      ),
+    );
+  }
+}
+
+// ========================================================
+// 既存の地図画面 (クラス名を HomeMapContent に変更)
+// ========================================================
+class HomeMapContent extends StatefulWidget {
+  const HomeMapContent({super.key});
+
+  @override
+  State<HomeMapContent> createState() => _HomeMapContentState();
+}
+
+class _HomeMapContentState extends State<HomeMapContent> {
   final supabase = Supabase.instance.client;
-    // 地方ごとの都道府県一覧
+  
+  // 地方ごとの都道府県一覧
   final Map<String, List<String>> _regions = {
     '北海道地方': ['北海道'],
     '東北地方': [
@@ -96,7 +151,6 @@ class _MapScreenState extends State<MapScreen> {
     '宮崎県': 'jp-45', '鹿児島県': 'jp-46', '沖縄県': 'jp-47',
   };
 
-  // ★追加：ID（jp-40）から日本語（福岡県）に翻訳する「逆引き辞書」を自動作成
   late final Map<String, String> _idToPrefName = 
       _prefNameToId.map((key, value) => MapEntry(value, key));
 
@@ -134,7 +188,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-    // 都道府県を選択して写真画面へ移動
   Future<void> _openPrefecture(String prefectureName) async {
     await Navigator.push(
       context,
@@ -146,8 +199,6 @@ class _MapScreenState extends State<MapScreen> {
     );
 
     if (!mounted) return;
-
-    // 写真画面から戻ったら地図の色を更新
     _fetchActivePrefectures();
   }
 
@@ -182,9 +233,7 @@ class _MapScreenState extends State<MapScreen> {
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(
-                color: Color(0xFFFFB4A8),
-              ),
+              decoration: BoxDecoration(color: Color(0xFFFFB4A8)),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
@@ -196,7 +245,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
             ),
-
             ..._regions.entries.expand((region) {
               return [
                 Padding(
@@ -210,15 +258,11 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
                 ),
-
                 ...region.value.map((prefecture) {
                   return ListTile(
                     dense: true,
                     title: Text(prefecture),
-                    leading: const Icon(
-                      Icons.location_on_outlined,
-                      size: 20,
-                    ),
+                    leading: const Icon(Icons.location_on_outlined, size: 20),
                     onTap: () {
                       Navigator.pop(context);
                       _openPrefecture(prefecture);
@@ -231,49 +275,42 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
       body: Stack(
-  children: [
-    // 既存の日本地図
-    Center(
-      child: InteractiveViewer(
-        child: SimpleMap(
-          key: ValueKey(_mapColors.toString()),
-          instructions: SMapJapan.instructions,
-          defaultColor: Colors.grey.shade50,
-          countryBorder: const CountryBorder(
-            color: Colors.black,
+        children: [
+          Center(
+            child: InteractiveViewer(
+              child: SimpleMap(
+                key: ValueKey(_mapColors.toString()),
+                instructions: SMapJapan.instructions,
+                defaultColor: Colors.grey.shade50,
+                countryBorder: const CountryBorder(color: Colors.black),
+                colors: _mapColors,
+                callback: (id, name, tapDetails) async {
+                  final lowerId = id.toLowerCase();
+                  final japaneseName = _idToPrefName[lowerId] ?? '不明な地域';
+                  if (japaneseName == '不明な地域') return;
+                  await _openPrefecture(japaneseName);
+                },
+              ),
+            ),
           ),
-          colors: _mapColors,
-          callback: (id, name, tapDetails) async {
-  final lowerId = id.toLowerCase();
-  final japaneseName = _idToPrefName[lowerId] ?? '不明な地域';
-
-  if (japaneseName == '不明な地域') return;
-
-  await _openPrefecture(japaneseName);
-},
-        ),
+          Positioned(
+            left: 20,
+            bottom: 20,
+            child: Builder(
+              builder: (context) => FloatingActionButton(
+                heroTag: 'regionMenu',
+                backgroundColor: const Color(0xFFFFB4A8),
+                foregroundColor: Colors.black87,
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+                child: const Icon(Icons.menu),
+              ),
+            ),
+          ),
+        ],
       ),
-    ),
-
-    // 左下のハンバーガーメニュー
-    Positioned(
-      left: 20,
-      bottom: 20,
-      child: Builder(
-        builder: (context) => FloatingActionButton(
-          heroTag: 'regionMenu',
-          backgroundColor: const Color(0xFFFFB4A8),
-          foregroundColor: Colors.black87,
-          onPressed: () {
-            Scaffold.of(context).openDrawer();
-          },
-          child: const Icon(Icons.menu),
-        ),
-      ),
-    ),
-  ],
-),
+      // ★ ここにあった bottomNavigationBar は親画面 (MapScreen) へ移動したため削除
     );
   }
-
 }
