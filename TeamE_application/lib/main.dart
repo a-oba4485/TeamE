@@ -7,6 +7,7 @@ import 'prefecture_timeline_page.dart';
 import 'log.dart';
 import 'group.dart';
 import 'mypage.dart';
+import 'delete_account_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -215,6 +216,14 @@ class _HomeMapContentState extends State<HomeMapContent> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
+            ),
+          ),
+                    IconButton(
+            icon: const Icon(Icons.person_remove_outlined),
+            tooltip: 'アカウント削除',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
             ),
           ),
           IconButton(
