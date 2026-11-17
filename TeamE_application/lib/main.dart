@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:countries_world_map/countries_world_map.dart';
 import 'auth_gate.dart';
-import 'change_password_page.dart';
 import 'prefecture_timeline_page.dart';
 import 'log.dart';
 import 'group.dart';
 import 'mypage.dart';
-import 'delete_account_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -209,30 +207,7 @@ class _HomeMapContentState extends State<HomeMapContent> {
       appBar: AppBar(
         title: const Text('思い出の地を選ぶ'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.key),
-            tooltip: 'パスワード変更',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ChangePasswordPage()),
-            ),
-          ),
-                    IconButton(
-            icon: const Icon(Icons.person_remove_outlined),
-            tooltip: 'アカウント削除',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'ログアウト',
-            onPressed: () async {
-              await Supabase.instance.client.auth.signOut();
-            },
-          ),
+        actions: [ 
         ],
         automaticallyImplyLeading: false,
       ),
