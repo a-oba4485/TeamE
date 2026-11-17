@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DeleteAccountPage extends StatefulWidget {
   const DeleteAccountPage({super.key});
@@ -10,6 +11,18 @@ class DeleteAccountPage extends StatefulWidget {
 class _DeleteAccountPageState extends State<DeleteAccountPage> {
   bool _isLoading = false;
   String? _errorMessage;
+
+  static const _bucket = 'photos';
+  static const _imageColumn = 'image_url';
+
+  String? _pathFromUrl(String? url) {
+    if (url == null) return null;
+    final match = RegExp(
+      '/object/(?:public|sign|authenticated)/$_bucket/([^?]+)',
+    ).firstMatch(url);
+    if (match == null) return null;
+    return Uri.decodeComponent(match.group(1)!);
+  }
 
   Future<void> _confirmAndDelete() async {
     if (_isLoading) return;
@@ -34,7 +47,59 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
     );
     if (ok != true) return;
 
-    debugPrint('削除が確認されました（まだ削除しません）');
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        setState(() => _errorMessage = 'ログイン情報を取得できませんでした');
+        return;
+      }
+
+      final rows = await supabase
+          .from('posts')
+          .select(_imageColumn)
+          .eq('user_id', userId);
+
+      final paths = <String>[];
+      for (final row in rows) {
+        final url = row[_imageColumn] as String?;
+        final path = _pathFromUrl(url);
+        if (url != null && path == null) {
+          debugPrint('パスを取り出せませんでした: $url');
+          setState(() => _errorMessage = '画像の場所を特定できませんでした');
+          return;
+        }
+        if (path != null) paths.add(path);
+      }
+      debugPrint('削除する画像のパス: $paths');
+
+      if (paths.isNotEmpty) {
+        final removed = await supabase.storage.from(_bucket).remove(paths);
+        debugPrint('画像: 対象${paths.length}件 / 削除${removed.length}件');
+        if (removed.length != paths.length) {
+          setState(() => _errorMessage = '画像を削除できませんでした');
+          return;
+        }
+      }
+
+      await supabase.rpc('delete_my_account');
+  
+      await supabase.auth.signOut(scope: SignOutScope.local);
+      if (!mounted) return;
+      Navigator.popUntil(context, (route) => route.isFirst);
+    } catch (e) {
+      debugPrint('アカウント削除エラー: $e');
+      if (mounted) {
+        setState(() => _errorMessage = '削除に失敗しました。時間をおいて再度お試しください');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
