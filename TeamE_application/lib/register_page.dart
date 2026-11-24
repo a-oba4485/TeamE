@@ -69,8 +69,33 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final supabase = Supabase.instance.client;
-      await supabase.auth.signUp(email: email, password: password);
+      // ★修正: signUp の結果を確認する。
+      // 以前は結果を見ずに無条件で最初の画面へ戻していたため、
+      // Supabase の「Confirm email」が有効な環境では session が null で返り、
+      // 案内もなくログイン画面へ戻されてしまっていた。
+      final res = await supabase.auth.signUp(email: email, password: password);
       if (!mounted) return;
+
+      // メール確認が有効な状態で登録済みアドレスを再登録すると、
+      // エラーにならず identities が空のユーザーが返る仕様。
+      // その場合は「確認メール送信済み」として案内する。
+      final identities = res.user?.identities;
+      if (identities != null && identities.isEmpty) {
+        await _showConfirmationMailDialog(email);
+        if (!mounted) return;
+        Navigator.popUntil(context, (route) => route.isFirst);
+        return;
+      }
+
+      if (res.session == null) {
+        // メール確認が必要な環境：まだログイン状態ではないので案内を出す
+        await _showConfirmationMailDialog(email);
+        if (!mounted) return;
+        Navigator.popUntil(context, (route) => route.isFirst);
+        return;
+      }
+
+      // メール確認が無効な環境：そのままログイン状態でアプリへ
       Navigator.popUntil(context, (route) => route.isFirst);
     } on AuthException catch (e) {
       if (mounted) setState(() => _errorMessage = _toJapanese(e.message));
@@ -81,6 +106,26 @@ class _RegisterPageState extends State<RegisterPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // ★追加: 確認メール送信の案内ダイアログ
+  Future<void> _showConfirmationMailDialog(String email) {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('確認メールを送信しました'),
+        content: Text(
+          '$email 宛に確認メールを送信しました。\n'
+          'メール内のリンクから認証を完了してから、ログインしてください。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
