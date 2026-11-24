@@ -65,30 +65,41 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
           .select(_imageColumn)
           .eq('user_id', userId);
 
+      // ★修正: Storage の掃除はベストエフォートにする。
+      // 以前は「パスが特定できない」「削除件数が一致しない」で return して
+      // 退会自体を中断していたため、画像が1枚でも既に消えていると
+      // 件数が永遠に合わず、二度とアカウントを削除できなくなっていた。
+      // 画像の後片付けで退会をブロックしない。
       final paths = <String>[];
       for (final row in rows) {
         final url = row[_imageColumn] as String?;
         final path = _pathFromUrl(url);
         if (url != null && path == null) {
-          debugPrint('パスを取り出せませんでした: $url');
-          setState(() => _errorMessage = '画像の場所を特定できませんでした');
-          return;
+          // 特定できない画像はスキップして退会を続行する
+          debugPrint('パスを取り出せませんでした（スキップします）: $url');
+          continue;
         }
         if (path != null) paths.add(path);
       }
       debugPrint('削除する画像のパス: $paths');
 
       if (paths.isNotEmpty) {
-        final removed = await supabase.storage.from(_bucket).remove(paths);
-        debugPrint('画像: 対象${paths.length}件 / 削除${removed.length}件');
-        if (removed.length != paths.length) {
-          setState(() => _errorMessage = '画像を削除できませんでした');
-          return;
+        try {
+          final removed = await supabase.storage.from(_bucket).remove(paths);
+          debugPrint('画像: 対象${paths.length}件 / 削除${removed.length}件');
+          if (removed.length != paths.length) {
+            // 件数が合わなくても退会は続行する（残った画像は孤立ファイルとして残るだけ）
+            debugPrint('一部の画像を削除できませんでしたが、退会を続行します');
+          }
+        } catch (e) {
+          // Storage削除で例外が出ても退会は続行する
+          debugPrint('画像削除でエラー（退会は続行します）: $e');
         }
       }
 
+      // ここが本処理。失敗したらエラー表示して止まるのは従来どおり。
       await supabase.rpc('delete_my_account');
-  
+
       await supabase.auth.signOut(scope: SignOutScope.local);
       if (!mounted) return;
       Navigator.popUntil(context, (route) => route.isFirst);
