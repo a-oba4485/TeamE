@@ -6,6 +6,7 @@ import 'prefecture_timeline_page.dart';
 import 'log.dart';
 import 'group.dart';
 import 'mypage.dart';
+import 'profile.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -169,13 +170,23 @@ class _HomeMapContentState extends State<HomeMapContent> {
           .select('prefecture')
           .eq('user_id', userId);
 
+      // 自分の色（profiles.map_color）。未設定ならデフォルト色で塗る。
+      // プロフィール取得に失敗しても地図自体は出すため、失敗時はデフォルト色のまま進める。
+      Color myColor = colorFromHex(null);
+      try {
+        final profile = await fetchProfile(userId);
+        myColor = mapColorOf(profile);
+      } catch (e) {
+        debugPrint('プロフィール取得エラー: $e');
+      }
+
       Map<String, Color> newColors = {};
-      
+
       for (var row in data) {
         final prefName = row['prefecture'] as String?;
         if (prefName != null && _prefNameToId.containsKey(prefName)) {
           final id = _prefNameToId[prefName]!.toUpperCase();
-          newColors[id] = const Color(0xFFD84A38);
+          newColors[id] = myColor;
         }
       }
 

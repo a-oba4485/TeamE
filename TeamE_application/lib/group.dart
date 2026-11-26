@@ -3,18 +3,23 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile.dart';
 
-// グループ機能（B案：グループ管理まで。投稿共有は次回）
+// グループ機能（管理＋投稿共有）
 // 使い方：
-//   1. Supabase ダッシュボードの SQL Editor で
-//      supabase-groups-tables.sql を実行する（テーブル作成＋RLS＋ポリシーがセット）。
-//      ※ groups / group_members を作る前に RLS の話はこの SQL の中に書いてある。
-//      ※ posts の RLS（supabase-rls-posts-live.sql）は未適用のままでも、
-//         このグループ管理だけは動く。投稿共有（A案）をやるときは別途 posts の
-//         RLS 拡張が必要になるので、そのときに一緒に設計すること。
-//   2. このファイルで lib/group.dart を置き換える。
+//   1. Supabase ダッシュボードの SQL Editor で、順に実行する。
+//      a. supabase-groups-tables.sql（groups / group_members の作成＋RLS）
+//      b. supabase-sharing-profiles.sql（profiles 作成＋posts の RLS と共有ポリシー）
+//      ※ b を実行するまでは「みんなの投稿」は表示されない（posts の読み取りが
+//         自分の行だけに制限される／そもそも RLS 未適用だと全公開になってしまうため）。
+//   2. このファイルで lib/group.dart を置き換える。lib/profile.dart の追加も必要。
 //      main.dart の変更は不要（MapScreen のタブに GroupScreen がすでに登録済み）。
 //   3. グループ作成→招待コードをメンバーに共有→相手はコード入力で参加、の流れで確認する。
+// 投稿共有の仕様：
+//   ・グループ詳細の「みんなの投稿」に、全メンバーの投稿が新しい順に出る（読み取り専用）。
+//     投稿者名は profiles.display_name、未設定の人はメールアドレスで代替表示する。
+//     posts の user_email はこの画面では select しない。
+//   ・メンバー一覧のアイコン色は各メンバーの profiles.map_color（自分の色）。
 
 class GroupScreen extends StatefulWidget {
   const GroupScreen({super.key});
@@ -338,6 +343,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   final _supabase = Supabase.instance.client;
   bool _loading = true;
   List<Map<String, dynamic>> _members = [];
+  // user_id → profiles 行（表示名・色）。行が無いメンバーは入っていない。
+  Map<String, Map<String, dynamic>> _profiles = {};
+  List<Map<String, dynamic>> _sharedPosts = [];
+  bool _loadingPosts = true;
 
   String get _groupId => widget.group['id'] as String;
   String get _groupName => widget.group['name'] as String? ?? '(名前なし)';
@@ -346,21 +355,27 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   @override
   void initState() {
     super.initState();
-    _loadMembers();
+    _loadAll();
   }
 
-  Future<void> _loadMembers() async {
+  Future<void> _loadAll() async {
     try {
       final data = await _supabase
           .from('group_members')
           .select('user_id, user_email, joined_at')
           .eq('group_id', _groupId)
           .order('joined_at', ascending: true);
+      final members = List<Map<String, dynamic>>.from(data);
+      final memberIds =
+          members.map((m) => m['user_id'] as String).toList();
+      final profiles = await fetchProfiles(memberIds);
       if (!mounted) return;
       setState(() {
-        _members = List<Map<String, dynamic>>.from(data);
+        _members = members;
+        _profiles = profiles;
         _loading = false;
       });
+      await _loadSharedPosts(memberIds);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -368,6 +383,106 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
         SnackBar(content: Text('メンバーの読み込みに失敗しました: $e')),
       );
     }
+  }
+
+  // 全メンバーの投稿を新しい順に取る。user_email は select しない
+  // （投稿者名は profiles.display_name を使う）。
+  Future<void> _loadSharedPosts(List<String> memberIds) async {
+    if (memberIds.isEmpty) {
+      if (mounted) setState(() => _loadingPosts = false);
+      return;
+    }
+    try {
+      final data = await _supabase
+          .from('posts')
+          .select('id, user_id, prefecture, image_url, comment, created_at')
+          .inFilter('user_id', memberIds)
+          .order('created_at', ascending: false)
+          .limit(100);
+      if (!mounted) return;
+      setState(() {
+        _sharedPosts = List<Map<String, dynamic>>.from(data);
+        _loadingPosts = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingPosts = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('投稿の読み込みに失敗しました: $e')),
+      );
+    }
+  }
+
+  // 投稿者名：表示名があれば表示名、無ければメンバー一覧のメールアドレス
+  String _authorName(String userId) {
+    final name = displayNameOf(_profiles[userId]);
+    if (name != null) return name;
+    for (final member in _members) {
+      if (member['user_id'] == userId) {
+        return member['user_email'] as String? ?? 'メンバー';
+      }
+    }
+    return 'メンバー';
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '';
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${dt.year}/${two(dt.month)}/${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  Widget _buildPostCard(Map<String, dynamic> post, String? myId) {
+    final authorId = post['user_id'] as String? ?? '';
+    final profile = _profiles[authorId];
+    final isMine = authorId == myId;
+    final imageUrl = post['image_url'] as String?;
+    final comment = (post['comment'] as String? ?? '').trim();
+    return Card(
+      color: Colors.white,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: CircleAvatar(
+              backgroundColor: mapColorOf(profile),
+              child: const Icon(Icons.person, color: Colors.white, size: 20),
+            ),
+            title: Text(
+              _authorName(authorId),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${post['prefecture'] as String? ?? ''} ・ ${_formatDate(post['created_at'] as String?)}',
+            ),
+            trailing: isMine
+                ? const Text(
+                    'あなたの投稿',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  )
+                : null,
+          ),
+          if (imageUrl != null && imageUrl.isNotEmpty)
+            Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: 200,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox(
+                height: 200,
+                child: Center(child: Icon(Icons.broken_image_outlined)),
+              ),
+            ),
+          if (comment.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(comment),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _copyInviteCode() async {
@@ -457,7 +572,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       appBar: AppBar(title: Text(_groupName)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          : RefreshIndicator(
+              onRefresh: _loadAll,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
                 Card(
@@ -494,26 +612,62 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 ),
                 const SizedBox(height: 8),
                 ..._members.map((member) {
+                  final memberId = member['user_id'] as String;
                   final isCreator =
-                      member['user_id'] == widget.group['created_by'];
-                  final isMe = member['user_id'] == myId;
+                      memberId == widget.group['created_by'];
+                  final isMe = memberId == myId;
+                  final profile = _profiles[memberId];
+                  final name = displayNameOf(profile);
+                  final email =
+                      member['user_email'] as String? ?? 'Unknown';
                   return Card(
                     color: Colors.white,
                     child: ListTile(
-                      leading: const Icon(Icons.account_circle_outlined),
+                      leading: CircleAvatar(
+                        backgroundColor: mapColorOf(profile),
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
                       title: Text(
-                        member['user_email'] as String? ?? 'Unknown',
+                        name ?? email,
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       subtitle: Text(
                         [
                           if (isCreator) '作成者',
                           if (isMe) 'あなた',
+                          if (name != null) email,
                         ].join('・'),
                       ),
                     ),
                   );
                 }),
+                const SizedBox(height: 24),
+                Text(
+                  'みんなの投稿（${_sharedPosts.length}件）',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'グループ全員の投稿が新しい順に表示されます。他の人の投稿は見るだけです。',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                if (_loadingPosts)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_sharedPosts.isEmpty)
+                  const Text('まだ投稿がありません。')
+                else
+                  ..._sharedPosts.map((post) => _buildPostCard(post, myId)),
                 const SizedBox(height: 24),
                 if (widget.isOwner)
                   FilledButton.icon(
@@ -529,6 +683,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     label: const Text('グループを退会する'),
                   ),
               ],
+              ),
             ),
     );
   }
